@@ -1,0 +1,57 @@
+---
+title: "Effects of climatic events on health and economy in the United States"
+author: "Guillermo L. Florez-Montero"
+date: "24/10/2020"
+output: html_document
+---
+
+<p>&nbsp;</p> 
+## Synopsis
+<p>&nbsp;</p> 
+
+Storms and other severe climatic events can cause both public health and economic problems for the population. Preventing such events as much as possible is a key concern, as many of them result in injuries and damage to people.
+
+This project aims to answer two main questions:
+
+      1. Across the United States, which types of events are most harmful with respect to population health? and
+      2. Across the United States, which types of events have the greatest economic consequences?
+
+To do that, we will explore the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+Detailed information about the data is available in the **National Weather Service [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)** and the **National Climatic Data Center [Storm Events FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)**
+
+<p>&nbsp;</p> 
+## Data Processing
+<p>&nbsp;</p> 
+
+We first need to call the packages we will use
+```{r library, echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+<p>&nbsp;</p>
+
+### Read the data
+
+```{r download-data, include=FALSE}
+if(!file.exists('repdata_data_StormData.csv.bz2')) {
+      download.file('https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2',
+                    'repdata_data_StormData.csv.bz2')
+}
+```
+
+
+We will read the entire data from the directory and explore the first three lines
+```{r read-data, echo=TRUE, cache=TRUE}
+
+StormData <- read.csv('repdata_data_StormData.csv.bz2')
+
+head(StormData,3)
+```
+
+
+
+<p>&nbsp;</p> 
+## Results
+<p>&nbsp;</p> 
