@@ -179,6 +179,9 @@ ph2 <- ggplot(data = mainecon, aes(x = reorder(EVENT.TYPE, -TOTAL.DAMAGE), y = T
 cowplot::plot_grid(ph1,ph2)
 
 ```
+Notice that considering the whole damage caused in the time, Tornadoes are the events that produce more damage for human health. For economy, Floods, Hurricanes and Typhoons, and Tornadoes are the most harmful events. 
+
+<p>&nbsp;</p>
 
 Now, we will assess the effect of each type of climatic events over the human health and economy by year.
 
