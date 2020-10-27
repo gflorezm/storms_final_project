@@ -11,10 +11,11 @@ output: html_document
 
 Storms and other severe climatic events can cause both public health and economic problems for the population. Preventing such events as much as possible is a key concern, as many of them result in injuries and damage to people.
 
-This project aims to answer two main questions:
+This project aims to answer two main questions
 
-      1. Across the United States, which types of events are most harmful with respect to population health? and
-      2. Across the United States, which types of events have the greatest economic consequences?
+   1. Across the United States, which types of events are most harmful with respect to population health? and
+   
+   2. Across the United States, which types of events have the greatest economic consequences?
 
 To do that, we will explore the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
 
@@ -28,6 +29,8 @@ We first need to call the packages we will use
 ```{r library, echo=TRUE, message=FALSE, warning=FALSE}
 library(dplyr)
 library(ggplot2)
+library(cowplot)
+library(lubridate)
 ```
 
 <p>&nbsp;</p>
@@ -47,11 +50,195 @@ We will read the entire data from the directory and explore the first three line
 
 StormData <- read.csv('repdata_data_StormData.csv.bz2')
 
+
 head(StormData,3)
+
+# look the size of the data set
+dim(StormData)
+
+# look for the names of the variables
+names(StormData)
+```
+
+<p>&nbsp;</p>
+
+### Process the data
+
+Reading the Storm Data documentation, in the point 2.6.3, we have noticed that the columns `PROPDMGEXP` and `CROPDMGEXP` are, in fact, exponents for the `PROPDMG` and `CROPDMG` variables respectively. We will create two new vectors containing the correct values for Property and Crop damage columns.
+
+```{r new-vectors, echo=TRUE, cache=TRUE}
+
+unique(StormData$PROPDMGEXP)
+unique(StormData$CROPDMGEXP)
+
+# I will separate the exponents in a new data frame
+EXP <- StormData %>%
+      dplyr::select(PROPDMGEXP,CROPDMGEXP)
+
+EXP[EXP == "1"] = 10
+EXP[EXP == "" | EXP == "+" | EXP == "-" | EXP == "?" | EXP == "0"] = 1
+EXP[EXP == "2" | EXP == "h" | EXP == "H"] = 100
+EXP[EXP == "3" | EXP == "K" | EXP == "k"] = 1000
+EXP[EXP == "4"] = 10000
+EXP[EXP == "5"] = 100000
+EXP[EXP == "6" | EXP == "m" | EXP == "M"] = 1000000
+EXP[EXP == "7"] = 10000000
+EXP[EXP == "8"] = 100000000
+EXP[EXP == "B"] = 1000000000
+
+EXP <- EXP %>%
+      dplyr::mutate(PROPDMGEXP = as.numeric(PROPDMGEXP),
+                    CROPDMGEXP = as.numeric(CROPDMGEXP))
+
+# explore the new exponents
+summary(EXP)
 ```
 
 
+We will separate only the data that we will use in this project, and correct de exponential values of the Property and Crop damage columns.
+
+```{r new-data, echo=TRUE, cache=TRUE}
+
+newdata <- StormData %>%
+      dplyr::select(EVTYPE,BGN_DATE, FATALITIES, INJURIES, PROPDMG, CROPDMG) %>%
+      dplyr::mutate(PROPDMG = PROPDMG * EXP$PROPDMGEXP,
+                    CROPDMG = CROPDMG * EXP$CROPDMGEXP,
+                    BGN_DATE = as.Date(BGN_DATE, '%m/%d/%Y'),
+                    YEAR = year(BGN_DATE))
+
+# remove original data to save memory
+rm(StormData, EXP)
+
+# inspect the new data
+summary(newdata)
+head(newdata)
+```
+
+Now we have a more comprehensible data set to perform the statistical analysis. But notice that there are `r length(unique(newdata$EVTYPE))` types of events in the data base. Therefore, the analysis will be carried out with the top five harmful events for both, human health and economics.
 
 <p>&nbsp;</p> 
 ## Results
 <p>&nbsp;</p> 
+
+We will identify the five most harmful climatic events in terms of the damages caused on human health (accounted as the sum of fatalities and injuries) 
+
+```{r main-events-human, echo=TRUE, message=FALSE}
+
+mainhuman <- newdata %>%
+      dplyr::group_by(EVTYPE) %>%
+      dplyr::summarise(TOTAL.DAMAGE = sum(FATALITIES + INJURIES)) %>%
+      dplyr::slice_max(TOTAL.DAMAGE, n = 5) %>%
+      dplyr::rename(EVENT.TYPE = EVTYPE)
+
+knitr::kable(mainhuman,
+             caption="Top events in terms of the total number of human health damage")
+
+```
+
+Now, we will identify the five most harmful climatic events in terms of economic damages (sum of crops and property damages).
+
+```{r main-events-economic, echo=TRUE, message=FALSE}
+
+mainecon <- newdata %>%
+      dplyr::group_by(EVTYPE) %>%
+      dplyr::summarise(TOTAL.DAMAGE = sum(CROPDMG + PROPDMG)) %>%
+      dplyr::slice_max(TOTAL.DAMAGE, n = 5) %>%
+      dplyr::rename(EVENT.TYPE = EVTYPE)
+
+knitr::kable(mainecon, format = "pandoc",
+             caption="Top events in terms of economic damages")
+
+```
+
+```{r plot, echo=TRUE, fig.width=15, fig.height=7}
+
+# For human health
+ph1 <- ggplot(data = mainhuman, aes(x = reorder(EVENT.TYPE, -TOTAL.DAMAGE), y = TOTAL.DAMAGE)) +
+      geom_bar(colour = "black", fill = "blue", alpha = 0.7, stat = "identity") +
+      theme_bw() +
+      labs(y = "Total human damages",
+           x = "Type of climatic event",
+           title = "Effect of each type of climatic events over the human health") +
+      theme(axis.title.x = element_text(face = "bold", vjust = -2),
+            axis.title.y = element_text(face = "bold", vjust = 3),
+            title = element_text(face = "bold"),
+      plot.margin = unit(c(1,1.2,1.2,1.2), "lines"))
+
+# For economy
+ph2 <- ggplot(data = mainecon, aes(x = reorder(EVENT.TYPE, -TOTAL.DAMAGE), y = TOTAL.DAMAGE)) +
+      geom_bar(colour = "black", fill = "green", alpha = 0.7, stat = "identity") +
+      theme_bw() +
+      labs(y = "Total economic damages",
+           x = "Type of climatic event",
+           title = "Effect of each type of climatic events over the econoy") +
+      theme(axis.title.x = element_text(face = "bold", vjust = -2),
+            axis.title.y = element_text(face = "bold", vjust = 3),
+            title = element_text(face = "bold"),
+      plot.margin = unit(c(1,1.2,1.2,1.2), "lines"))
+
+cowplot::plot_grid(ph1,ph2)
+
+```
+
+Now, we will assess the effect of each type of climatic events over the human health and economy by year.
+
+First we need to prepare the data
+
+
+```{r event-year, echo=TRUE, message=FALSE}
+
+human_year <- newdata %>%
+            dplyr::filter(EVTYPE == "TORNADO" |
+                    EVTYPE == "EXCESSIVE HEAT" |
+                    EVTYPE == "TSTM WIND" |
+                    EVTYPE == "FLOOD" |
+                    EVTYPE == "LIGHTNING") %>%
+      dplyr::group_by(EVTYPE, YEAR) %>%
+      dplyr::summarise(TOTAL.DAMAGE = sum(INJURIES + FATALITIES)) %>%
+      dplyr::rename(EVENT.TYPE = EVTYPE)
+
+economy_year <- newdata %>%
+      dplyr::filter(EVTYPE == "FLOOD" |
+                    EVTYPE == "HURRICANE/TYPHOON" |
+                    EVTYPE == "TORNADO" |
+                    EVTYPE == "STORM SURGE" |
+                    EVTYPE == "HAIL") %>%
+      dplyr::group_by(EVTYPE, YEAR) %>%
+      dplyr::summarise(TOTAL.DAMAGE = sum(CROPDMG + PROPDMG)) %>%
+      dplyr::rename(EVENT.TYPE = EVTYPE)
+```
+
+Finally we will make the plots of the total damage of each type of event across the years.
+
+```{r plot2, echo=TRUE, fig.width=15, fig.height=10}
+
+# For human damages
+pp1 <- ggplot(data = human_year, aes(x = YEAR, y = TOTAL.DAMAGE)) +
+      geom_line(aes(colour = EVENT.TYPE), size = 1.5) +
+      theme_bw() +
+      labs(y = "Total human damages",
+           x = "Year",
+           colour = "Type of event",
+           title = "Effect of each climatic events over the human health across the years") +
+      theme(axis.title.x = element_text(face = "bold", vjust = -2),
+            axis.title.y = element_text(face = "bold", vjust = 3),
+            title = element_text(face = "bold"),
+      plot.margin = unit(c(1,1.2,1.2,1.2), "lines"))
+
+# For economic damage
+pp2 <- ggplot(data = economy_year, aes(x = YEAR, y = TOTAL.DAMAGE)) +
+      geom_line(aes(colour = EVENT.TYPE), size = 1.5) +
+      theme_bw() +
+      labs(y = "Total economic damages",
+           x = "Year",
+           colour = "Type of event",
+           title = "Effect of each climatic events over the economy across the years") +
+      theme(axis.title.x = element_text(face = "bold", vjust = -2),
+            axis.title.y = element_text(face = "bold", vjust = 3),
+            title = element_text(face = "bold"),
+      plot.margin = unit(c(1,1.2,1.2,1.2), "lines"))
+
+cowplot::plot_grid(pp1,pp2, ncol = 1)
+```
+
+So, Tornadoes and Floods seems to be the most harmful climatic events for human health and life. Concerning to economy, Floods, Hurricanes and Typhoons, and Storm Surges seems to be very harmful.
